@@ -1,0 +1,169 @@
+<!-- frontend/index.html -->
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Task Tracker</title>
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Arial, sans-serif;
+            background: linear-gradient(135deg, #eef2ff, #f4f6f8);
+            margin: 0;
+            padding: 0;
+            min-height: 100vh;
+            color: #1f2937;
+        }
+
+        .container {
+            max-width: 480px;
+            margin: 60px auto;
+            background: #ffffff;
+            padding: 32px;
+            border-radius: 16px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+        }
+
+        h1 {
+            text-align: center;
+            font-size: 26px;
+            margin-bottom: 28px;
+            color: #111827;
+            font-weight: 700;
+        }
+
+        h2 {
+            font-size: 15px;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: #6b7280;
+            margin-bottom: 16px;
+        }
+
+        input[type="email"],
+        input[type="password"],
+        input[type="text"] {
+            width: 100%;
+            padding: 12px 14px;
+            margin-bottom: 12px;
+            border: 1px solid #d1d5db;
+            border-radius: 10px;
+            font-size: 14px;
+            transition: border-color 0.15s ease, box-shadow 0.15s ease;
+        }
+
+        input:focus {
+            outline: none;
+            border-color: #4f46e5;
+            box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.15);
+        }
+
+        button {
+            background: #4f46e5;
+            color: white;
+            border: none;
+            padding: 11px 18px;
+            border-radius: 10px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            margin-right: 8px;
+            margin-bottom: 12px;
+            transition: background 0.15s ease, transform 0.1s ease;
+        }
+
+        button:hover {
+            background: #4338ca;
+            transform: translateY(-1px);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        #task-section>button {
+            background: #6b7280;
+        }
+
+        #task-section>button:hover {
+            background: #4b5563;
+        }
+
+        #auth-message {
+            color: #dc2626;
+            font-size: 13px;
+            min-height: 18px;
+            margin-top: 4px;
+        }
+
+        #task-list {
+            list-style: none;
+            padding: 0;
+            margin-top: 18px;
+        }
+
+        #task-list li {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: #f9fafb;
+            padding: 12px 16px;
+            border-radius: 10px;
+            margin-bottom: 10px;
+            font-size: 14px;
+            border: 1px solid #f0f1f3;
+        }
+
+        #task-list li button {
+            font-size: 12px;
+            padding: 7px 12px;
+            margin: 0 0 0 8px;
+        }
+
+        #task-list li button:last-child {
+            background: #dc2626;
+        }
+
+        #task-list li button:last-child:hover {
+            background: #b91c1c;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="container">
+        <h1>Task Tracker</h1>
+
+        <!-- Auth section -->
+        <div id="auth-section">
+            <h2>Register / Login</h2>
+            <input type="email" id="email" placeholder="Email">
+            <input type="password" id="password" placeholder="Password">
+            <button onclick="register()">Register</button>
+            <button onclick="login()">Login</button>
+            <p id="auth-message"></p>
+        </div>
+
+        <!-- Task section (hidden until logged in) -->
+        <div id="task-section" style="display: none;">
+            <h2>Your Tasks</h2>
+            <button onclick="logout()">Logout</button>
+
+            <div>
+                <input type="text" id="task-title" placeholder="Task title">
+                <button onclick="createTask()">Add Task</button>
+            </div>
+
+            <ul id="task-list"></ul>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+
+</html>

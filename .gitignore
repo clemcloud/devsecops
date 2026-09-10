@@ -1,0 +1,39 @@
+# ---- Environment variables / secrets ----
+.env
+*.env
+!.env.example
+
+# ---- Python ----
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+venv/
+.venv/
+*.egg-info/
+.pytest_cache/
+
+# ---- Node (if you ever add tooling later) ----
+node_modules/
+
+# ---- Terraform ----
+.terraform/
+*.tfstate
+*.tfstate.backup
+*.tfvars
+!terraform.tfvars.example
+.terraform.lock.hcl
+crash.log
+
+# ---- Docker ----
+*.log
+
+# ---- OS / editor junk ----
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# ---- Kubernetes / kubeconfig (never commit cluster credentials) ----
+kubeconfig
+*.kubeconfig
