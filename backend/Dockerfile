@@ -13,7 +13,8 @@ FROM python:3.12-slim AS production
 RUN addgroup --system --gid 1000 appgroup && adduser --system --uid 1000 --ingroup appgroup appuser
 
 # Install dumb-init for correct PID 1 signal handling, then clean up apt cache
-RUN apt-get update && apt-get install -y --no-install-recommends dumb-init \
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    dumb-init=1.2.5-3 \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
