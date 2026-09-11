@@ -9,7 +9,8 @@ FROM python:3.12-slim-bookworm AS production
 
 RUN addgroup --system --gid 1000 appgroup && adduser --system --uid 1000 --ingroup appgroup appuser
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
+RUN apt-get update && apt-get upgrade -y && \
+    apt-get install -y --no-install-recommends \
     dumb-init \
     && rm -rf /var/lib/apt/lists/*
 
