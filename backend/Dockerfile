@@ -1,18 +1,17 @@
 # ---- Build stage ----
-FROM python:3.12-slim AS build
+FROM python:3.12-slim-bookworm AS build
 
 WORKDIR /app
 
 COPY requirements.txt .
 RUN pip install --no-cache-dir --user -r requirements.txt
-
 # ---- Production stage ----
-FROM python:3.12-slim AS production
+FROM python:3.12-slim-bookworm AS production
 
 # Create a dedicated non-root system user to run the app
 RUN addgroup --system --gid 1000 appgroup && adduser --system --uid 1000 --ingroup appgroup appuser
 
-# Install dumb-init for correct PID 1 signal handling, then clean up apt cache
+# Install dumb-init for correct PID 1 signal handling, then clean up apt cache to reduce image size
 RUN apt-get update && apt-get install -y --no-install-recommends \
     dumb-init=1.2.5-3 \
     && rm -rf /var/lib/apt/lists/*
