@@ -1,0 +1,220 @@
+name: DevSecOps Pipeline
+
+on:
+  push:
+    branches: ["*"]
+  pull_request:
+    branches: ["*"]
+
+permissions:
+  contents: read
+
+env:
+  AWS_REGION: ${{ secrets.AWS_REGION }}
+  ECR_BACKEND_REPO: devsecops-backend
+  ECR_FRONTEND_REPO: devsecops-frontend
+
+jobs:
+  # ============================================
+  # STAGE 1: Lint
+  # ============================================
+  lint:
+    name: "Lint Backend"
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install dependencies
+        working-directory: backend
+        run: pip install -r requirements.txt flake8
+      - name: Run flake8
+        working-directory: backend
+        run: flake8 app/ --max-line-length=120
+
+  # ============================================
+  # STAGE 2: Secrets scan
+  # ============================================
+  secrets-scan:
+    name: "Secrets Scan"
+    runs-on: ubuntu-latest
+    needs: lint
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # ============================================
+  # STAGE 3: SAST
+  # ============================================
+  sast:
+    name: "SAST Scan"
+    runs-on: ubuntu-latest
+    needs: lint
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Bandit scan
+        run: |
+          pip install bandit
+          bandit -r backend/app -f json -o bandit-report.json || true
+      - uses: actions/upload-artifact@v4
+        with:
+          name: bandit-report
+          path: bandit-report.json
+
+  # ============================================
+  # STAGE 4: SCA
+  # ============================================
+  sca:
+    name: "Dependency Audit"
+    runs-on: ubuntu-latest
+    needs: lint
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: pip-audit
+        run: |
+          pip install pip-audit
+          pip-audit -r backend/requirements.txt
+
+  # ============================================
+  # STAGE 5: Dockerfile lint
+  # ============================================
+  dockerfile-lint:
+    name: "Dockerfile Lint"
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    strategy:
+      matrix:
+        component: [backend, frontend]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hadolint/hadolint-action@v3.1.0
+        with:
+          dockerfile: ${{ matrix.component }}/Dockerfile
+          failure-threshold: warning
+
+  # ============================================
+  # STAGE 6: IaC scan — Terraform
+  # ============================================
+  iac-scan:
+    name: "Terraform Security Scan"
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    needs: lint
+    steps:
+      - uses: actions/checkout@v4
+      - uses: bridgecrewio/checkov-action@v12
+        with:
+          directory: terraform/
+          framework: terraform
+          soft_fail: false
+          output_format: cli
+
+  # ============================================
+  # STAGE 7: Build, scan, push images (matrix)
+  # ============================================
+  build-scan-push:
+    name: "Build ${{ matrix.component }}"
+    runs-on: ubuntu-latest
+    needs: [secrets-scan, sast, sca, dockerfile-lint, iac-scan]
+    outputs:
+      short_sha: ${{ steps.sha.outputs.short }}
+    strategy:
+      matrix:
+        component: [backend, frontend]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Get short SHA
+        id: sha
+        run: echo "short=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to ECR
+        id: ecr-login
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Set repo name
+        id: repo
+        run: |
+          if [ "${{ matrix.component }}" = "backend" ]; then
+            echo "name=$ECR_BACKEND_REPO" >> $GITHUB_OUTPUT
+          else
+            echo "name=$ECR_FRONTEND_REPO" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Build image
+        run: |
+          docker build -t ${{ steps.repo.outputs.name }}:${{ steps.sha.outputs.short }} ./${{ matrix.component }}
+
+      - name: Trivy scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ steps.repo.outputs.name }}:${{ steps.sha.outputs.short }}
+          format: table
+          exit-code: "1"
+          severity: "CRITICAL,HIGH"
+
+      - name: Tag and push
+        if: github.event_name != 'pull_request'
+        env:
+          ECR_REGISTRY: ${{ steps.ecr-login.outputs.registry }}
+        run: |
+          docker tag ${{ steps.repo.outputs.name }}:${{ steps.sha.outputs.short }} $ECR_REGISTRY/${{ steps.repo.outputs.name }}:${{ steps.sha.outputs.short }}
+          docker tag ${{ steps.repo.outputs.name }}:${{ steps.sha.outputs.short }} $ECR_REGISTRY/${{ steps.repo.outputs.name }}:latest
+          docker push $ECR_REGISTRY/${{ steps.repo.outputs.name }}:${{ steps.sha.outputs.short }}
+          docker push $ECR_REGISTRY/${{ steps.repo.outputs.name }}:latest
+
+  # ============================================
+  # STAGE 8: Update K8s manifest with new image tags
+  # Only runs on push to main, not PRs
+  # ============================================
+  update-manifest:
+    name: "Update K8s Manifest"
+    runs-on: ubuntu-latest
+    needs: build-scan-push
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Update image tags in manifest
+        env:
+          IMAGE_TAG: ${{ needs.build-scan-push.outputs.short_sha }}
+          AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
+        run: |
+          REGISTRY="${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com"
+
+          sed -i "s|image: ${REGISTRY}/${ECR_BACKEND_REPO}:.*|image: ${REGISTRY}/${ECR_BACKEND_REPO}:${IMAGE_TAG}|" k8s/manifest.yaml
+          sed -i "s|image: ${REGISTRY}/${ECR_FRONTEND_REPO}:.*|image: ${REGISTRY}/${ECR_FRONTEND_REPO}:${IMAGE_TAG}|" k8s/manifest.yaml
+
+          echo "Updated images to tag: ${IMAGE_TAG}"
+          grep "image:" k8s/manifest.yaml
+
+      - name: Commit and push manifest update
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add k8s/manifest.yaml
+          git diff --cached --quiet || git commit -m "ci: update image tags to ${{ needs.build-scan-push.outputs.short_sha }} [skip ci]"
+          git push

@@ -10,7 +10,7 @@ RUN pip install --no-cache-dir --user -r requirements.txt
 FROM python:3.12-slim AS production
 
 # Create a dedicated non-root system user to run the app
-RUN addgroup --system appgroup && adduser --system --ingroup appgroup appuser
+RUN addgroup --system --gid 1000 appgroup && adduser --system --uid 1000 --ingroup appgroup appuser
 
 # Install dumb-init for correct PID 1 signal handling, then clean up apt cache
 RUN apt-get update && apt-get install -y --no-install-recommends dumb-init \

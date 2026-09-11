@@ -8,9 +8,9 @@ COPY script.js /usr/share/nginx/html/
 # Replace nginx's default config entirely with our own
 COPY nginx.conf /etc/nginx/nginx.conf
 
-RUN chown -R nginx:nginx /usr/share/nginx/html /var/cache/nginx /tmp
+RUN chown -R 101:101 /usr/share/nginx/html /var/cache/nginx /tmp
 
-USER nginx
+USER 101
 
 EXPOSE 8080
 
