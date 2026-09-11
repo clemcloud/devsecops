@@ -144,7 +144,7 @@ spec:
               done
       containers:
         - name: backend
-          image: 711396989588.dkr.ecr.us-east-1.amazonaws.com/devsecops-backend:latest
+          image: 711396989588.dkr.ecr.us-east-1.amazonaws.com/devsecops-backend:07a1288
           ports:
             - containerPort: 8000
           envFrom:
@@ -216,7 +216,7 @@ spec:
           effect: "NoSchedule"
       containers:
         - name: frontend
-          image: 711396989588.dkr.ecr.us-east-1.amazonaws.com/devsecops-frontend:latest
+          image: 711396989588.dkr.ecr.us-east-1.amazonaws.com/devsecops-frontend:07a1288
           ports:
             - containerPort: 8080
           resources:
